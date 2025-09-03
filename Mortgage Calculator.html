@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Mortgage / Loan Calculator — HTML + JS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Pure HTML/CSS/JS mortgage calculator with amortization schedule, extra payments, and CSV export." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%237c5cff'/%3E%3C/svg%3E">
+  <style>
+    :root{
+      --bg:#0b1020;--panel:#12182a;--muted:#94a3b8;--text:#e6eaf2;
+      --brand:#7c5cff;--border:#1e2742;--success:#10b981;--danger:#ef4444;
+      --radius:14px;--shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    [data-theme="light"]{
+      --bg:#f7f8fb;--panel:#ffffff;--muted:#525f77;--text:#0f172a;
+      --brand:#5b47e0;--border:#e6e8ef;--success:#059669;--danger:#dc2626;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1200px 700px at 10% -10%,rgba(124,92,255,.10),transparent),var(--bg);color:var(--text);font:15px/1.6 system-ui,Segoe UI,Roboto,Arial}
+    .container{max-width:1100px;margin:auto;padding:20px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    h1{margin:0;font-size:24px}
+    .muted{color:var(--muted)}
+    .grid{display:grid;gap:14px}
+    @media(min-width:900px){.cols-2{grid-template-columns:1fr 1fr}}
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02));border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .pad{padding:16px}
+    label{font-weight:600;margin-bottom:6px;display:block}
+    input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:transparent;color:inherit}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .btn{padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:transparent;color:inherit;cursor:pointer}
+    .btn.brand{background:linear-gradient(180deg,var(--brand),rgba(124,92,255,.75));color:white;border-color:transparent}
+    .btn.ghost{background:transparent}
+    .btn.success{background:linear-gradient(180deg,var(--success),#0ea5a0);border-color:transparent;color:white}
+    .btn.danger{background:linear-gradient(180deg,var(--danger),#b91c1c);border-color:transparent;color:white}
+    .kpi{padding:12px;border-radius:12px;border:1px dashed var(--border);display:flex;flex-direction:column;gap:6px}
+    .kpi .v{font-size:22px;font-weight:800}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid var(--border);text-align:right}
+    th:first-child,td:first-child{text-align:left}
+    .scroll{max-height:380px;overflow:auto;border:1px solid var(--border);border-radius:12px}
+    footer{margin:26px 0 8px;color:var(--muted);text-align:center}
+    .badge{font-size:12px;border:1px solid var(--border);padding:2px 8px;border-radius:999px}
+    .status{min-height:20px}
+
+    /* Onboarding modal */
+    .ob-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50;animation:fade .2s ease}
+    .ob-open{display:flex}
+    .ob-card{width:min(660px,92vw);background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:18px;transform:translateY(10px);opacity:0;animation:rise .25s ease forwards}
+    .ob-actions{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+
+    /* Calculation summary popup (centered) */
+    .calc-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:60;animation:fade .2s ease}
+    .calc-open{display:flex}
+    .calc-card{width:min(820px,96vw);background:var(--panel);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);padding:18px;transform:scale(.98);opacity:0;animation:pop .22s ease forwards}
+    .calc-kpi{padding:12px;border-radius:12px;border:1px dashed var(--border);display:flex;flex-direction:column;gap:6px}
+    .calc-kpi .v{font-size:20px;font-weight:800}
+    .calc-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+    .tip{font-size:13px;color:var(--muted)}
+
+    @keyframes fade{from{opacity:0}to{opacity:1}}
+    @keyframes rise{to{opacity:1;transform:none}}
+    @keyframes pop{to{opacity:1;transform:none}}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-theme="dark">
+  <div class="container">
+    <header>
+      <div>
+        <h1>Mortgage / Loan Calculator</h1>
+        <div class="muted">Built with HTML5 + Vanilla JS. + JS • Amortization • Extra payments • CSV export</div>
+      </div>
+      <div class="row">
+        <button id="helpBtn" class="btn ghost" title="How it works">❓ Help</button>
+        <button id="themeBtn" class="btn">🌙 Theme</button>
+        <a class="btn ghost" href="#" id="resetBtn" title="Reset inputs">Reset</a>
+        <span class="badge">Frontend only</span>
+      </div>
+    </header>
+
+    <div class="grid cols-2">
+      <!-- Inputs -->
+      <section class="panel pad">
+        <div class="grid">
+          <div>
+            <label>Loan Amount</label>
+            <input id="principal" type="number" min="0" step="0.01" value="350000">
+          </div>
+          <div>
+            <label>Interest Rate (APR %)</label>
+            <input id="rate" type="number" min="0" step="0.001" value="6.5">
+          </div>
+          <div>
+            <label>Term (years)</label>
+            <input id="years" type="number" min="1" step="1" value="30">
+          </div>
+          <div>
+            <label>Extra Payment / month (optional)</label>
+            <input id="extra" type="number" min="0" step="0.01" value="0">
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button id="calcBtn" class="btn brand">Calculate</button>
+          <button id="csvBtn" class="btn success">Download CSV</button>
+          <span id="status" class="muted status"></span>
+        </div>
+      </section>
+
+      <!-- KPIs + Chart -->
+      <section class="panel pad">
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          <div class="kpi"><div class="muted">Base Monthly</div><div id="k_monthly" class="v">$0.00</div></div>
+          <div class="kpi"><div class="muted">Total Interest</div><div id="k_interest" class="v">$0.00</div></div>
+          <div class="kpi"><div class="muted">Total Paid</div><div id="k_total" class="v">$0.00</div></div>
+          <div class="kpi"><div class="muted">Interest Saved</div><div id="k_saved" class="v">–</div></div>
+          <div class="kpi"><div class="muted">Months Saved</div><div id="k_months_saved" class="v">–</div></div>
+        </div>
+        <div style="margin-top:14px">
+          <canvas id="chart" height="110"></canvas>
+        </div>
+      </section>
+    </div>
+
+    <!-- Table -->
+    <section class="panel pad" style="margin-top:14px">
+      <h3 style="margin:0 0 8px 0">Amortization Schedule</h3>
+      <div class="scroll">
+        <table id="table">
+          <thead>
+            <tr>
+              <th>#</th><th>Interest</th><th>Principal</th><th>Extra</th><th>Total</th><th>Remaining</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      Prudence Nwadike. Need a hand? Click <strong>Help</strong> for a quick walkthrough.
+    </footer>
+  </div>
+
+  <!-- Onboarding modal -->
+  <div id="onboard" class="ob-overlay" role="dialog" aria-modal="true" aria-labelledby="ob_title">
+    <div class="ob-card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 id="ob_title" style="margin:0">How to use this calculator</h3>
+        <button id="ob_close" class="btn">✕</button>
+      </div>
+      <ol style="margin:10px 0 0 18px">
+        <li>Enter <strong>Loan Amount</strong>, <strong>APR %</strong>, and <strong>Term (years)</strong>.</li>
+        <li>Optionally add an <strong>Extra Payment</strong> you plan to pay each month.</li>
+        <li>Click <strong>Calculate</strong> to see the chart and <strong>Amortization Schedule</strong>.</li>
+        <li>Use <strong>Download CSV</strong> to export the schedule.</li>
+        <li>Switch <strong>Theme</strong> or <strong>Reset</strong> the inputs anytime.</li>
+      </ol>
+      <div class="ob-actions">
+        <label class="row" style="gap:8px"><input id="ob_hide" type="checkbox"> Don't show again</label>
+        <div class="row">
+          <button id="ob_gotit" class="btn brand">Got it</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calculation summary popup (centered; opens only after Calculate) -->
+  <div id="calcModal" class="calc-overlay" role="dialog" aria-modal="true" aria-labelledby="calc_title">
+    <div class="calc-card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 id="calc_title" style="margin:0">Your Results</h3>
+        <button id="calc_close" class="btn" aria-label="Close results">✕</button>
+      </div>
+      <div id="calc_content" class="calc-grid" style="margin-top:10px"></div>
+
+      <div class="tip" style="margin-top:10px">
+        <strong>What this means:</strong>
+        <ul>
+          <li><em>Base Monthly</em> = the standard monthly payment using your loan amount, APR, and term.</li>
+          <li>Each month you first pay <em>interest</em> on what’s left. The rest reduces the <em>principal</em> (the amount you still owe).</li>
+          <li>Adding an <em>Extra / month</em> goes straight to principal, so you finish sooner and pay less <em>Total Interest</em>.</li>
+          <li><em>Payoff Date</em> is when your balance should hit zero if you keep making these payments.</li>
+        </ul>
+        <details>
+          <summary>Glossary (APR, principal, interest)</summary>
+          <p>
+            <strong>APR</strong>: Annual Percentage Rate — your yearly interest rate.<br>
+            <strong>Principal</strong>: the amount you borrowed that you still need to repay.<br>
+            <strong>Interest</strong>: the cost you pay to borrow money.
+          </p>
+        </details>
+      </div>
+
+      <div class="row" style="justify-content:space-between;margin-top:10px">
+        <button id="calc_ok" class="btn brand">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========= Utilities =========
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n, cur='USD') => Number(n||0).toLocaleString(undefined,{style:'currency',currency:cur});
+
+    // ========= Calculator Logic =========
+    function monthlyPayment(P, r, n){ if (r === 0) return P / n; return P * r / (1 - Math.pow(1 + r, -n)); }
+    function buildSchedule(principal, apr, years, extra){
+      const r = apr/100/12; const n = years*12; const baseMonthly = monthlyPayment(principal, r, n); const firstInterest = principal * r;
+      if (r > 0 && baseMonthly <= firstInterest) { throw new Error('Monthly payment would not cover first-month interest. Increase term or lower rate.'); }
+      let balance = principal, totalInterest = 0, totalPaid = 0, k = 0; const schedule = [], maxSteps = n*2 + 1200;
+      while (balance > 0 && k < maxSteps) {
+        k++; const interest = +(balance * r).toFixed(2); let pay = baseMonthly + extra; let principalPortion = r===0 ? pay : pay - interest; if (principalPortion > balance) principalPortion = balance;
+        const actualPayment = +(interest + principalPortion).toFixed(2); balance = +(balance - principalPortion).toFixed(2); totalInterest = +(totalInterest + interest).toFixed(2); totalPaid = +(totalPaid + actualPayment).toFixed(2);
+        const basePrincipal = Math.max(0, baseMonthly - interest); const extraThis = +(Math.max(0, principalPortion - basePrincipal)).toFixed(2);
+        schedule.push({ paymentNumber:k, interest:+interest.toFixed(2), principal:+principalPortion.toFixed(2), extra:+extraThis.toFixed(2), totalPayment:+actualPayment.toFixed(2), remainingBalance:Math.max(0, +balance.toFixed(2)) });
+      }
+      return { baseMonthly:+baseMonthly.toFixed(2), totalInterest:+totalInterest.toFixed(2), totalPaid:+totalPaid.toFixed(2), schedule };
+    }
+
+    let chart;
+    function render(scheduleObj, baselineObj){
+      const { baseMonthly, totalInterest, totalPaid, schedule } = scheduleObj;
+      $('k_monthly').textContent = fmt(baseMonthly);
+      $('k_interest').textContent = fmt(totalInterest);
+      $('k_total').textContent = fmt(totalPaid);
+      if (baselineObj) {
+        const saved = +(baselineObj.totalInterest - scheduleObj.totalInterest).toFixed(2);
+        const monthsSaved = baselineObj.schedule.length - scheduleObj.schedule.length;
+        $('k_saved').textContent = saved > 0 ? fmt(saved) : '—';
+        $('k_months_saved').textContent = monthsSaved > 0 ? monthsSaved + ' mo' : '—';
+      } else { $('k_saved').textContent = '—'; $('k_months_saved').textContent = '—'; }
+      const tbody = $('table').querySelector('tbody'); tbody.innerHTML = ''; const frag = document.createDocumentFragment();
+      for (const r of schedule) { const tr = document.createElement('tr'); tr.innerHTML = `<td>${r.paymentNumber}</td><td>${fmt(r.interest)}</td><td>${fmt(r.principal)}</td><td>${fmt(r.extra)}</td><td>${fmt(r.totalPayment)}</td><td>${fmt(r.remainingBalance)}</td>`; frag.appendChild(tr); }
+      tbody.appendChild(frag);
+      const labels = schedule.map(r => r.paymentNumber); const dataI = schedule.map(r => r.interest); const dataP = schedule.map(r => r.principal); const bal = schedule.map(r => r.remainingBalance);
+      const ctx = $('chart').getContext('2d'); if (chart) chart.destroy();
+      chart = new Chart(ctx, { type:'bar', data:{ labels, datasets:[ {label:'Interest', data:dataI, stack:'pmt'}, {label:'Principal', data:dataP, stack:'pmt'}, {label:'Remaining Balance', data:bal, type:'line', yAxisID:'y1'} ] }, options:{ interaction:{mode:'index',intersect:false}, scales:{ y:{beginAtZero:true,title:{display:true,text:'Payment'}}, y1:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'Balance'}}, x:{ticks:{maxTicksLimit:12},title:{display:true,text:'Month'}} }, plugins:{legend:{position:'top'}} } });
+    }
+
+    function toCSV(schedule){
+      const header=['Payment #','Interest','Principal','Extra','Total Payment','Remaining'];
+      const rows=schedule.map(r=>[r.paymentNumber,r.interest,r.principal,r.extra,r.totalPayment,r.remainingBalance]);
+      return [header,...rows].map(r=>r.join(',')).join('\n'); /* fixed newline */
+    }
+    function download(filename, text){ const blob=new Blob([text],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); URL.revokeObjectURL(a.href); }
+
+    // ===== Results popup =====
+    const calcModal = $('calcModal');
+    const openCalc = () => calcModal.classList.add('calc-open');
+    const closeCalc = () => calcModal.classList.remove('calc-open');
+    $('calc_close').onclick = closeCalc; $('calc_ok').onclick = closeCalc;
+
+    function payoffDateFromNow(months){ const d=new Date(); d.setMonth(d.getMonth()+months); return d.toLocaleDateString(undefined,{month:'short',year:'numeric'}); }
+    function showCalcSummary(withExtra, baseline){
+      const months = withExtra.schedule.length; const monthsBase = baseline.schedule.length; const monthsSaved = monthsBase - months;
+      const interestSaved = +(baseline.totalInterest - withExtra.totalInterest).toFixed(2);
+      const extra = parseFloat($('extra').value||'0'); const payoffDate = payoffDateFromNow(months);
+
+      const tiles = [
+        ['Base Monthly', withExtra.baseMonthly, true],
+        ['Extra / month', extra, true],
+        ['Total Interest', withExtra.totalInterest, true],
+        ['Total Paid', withExtra.totalPaid, true],
+        ['Months to Payoff', months, false],
+        ['Payoff Date', payoffDate, false],
+        ['Months Saved', monthsSaved>0?monthsSaved:'—', false],
+        ['Interest Saved', interestSaved>0?interestSaved:'—', true],
+      ];
+      $('calc_content').innerHTML = tiles.map(([label,val,isMoney]) =>
+        `<div class="calc-kpi"><div class="muted">${label}</div><div class="v">${isMoney && typeof val==='number' ? fmt(val) : (typeof val==='number'? val : val)}</div></div>`
+      ).join('');
+      openCalc();
+    }
+
+    // ========= Theme =========
+    const themeBtn = $('themeBtn'); function setTheme(t){ document.body.setAttribute('data-theme', t); themeBtn.textContent = t==='dark' ? '🌙 Theme' : '☀️ Theme'; }
+    themeBtn.addEventListener('click', () => setTheme(document.body.getAttribute('data-theme')==='dark' ? 'light' : 'dark')); setTheme('dark');
+
+    // ========= Onboarding =========
+    const KEY_HIDE = 'mortgage_ob_hide'; const ob = $('onboard'); const openOB = () => { ob.classList.add('ob-open'); }; const closeOB = () => { ob.classList.remove('ob-open'); };
+    $('ob_close').onclick = closeOB; $('ob_gotit').onclick = () => { if ($('ob_hide').checked) localStorage.setItem(KEY_HIDE,'1'); closeOB(); }; $('helpBtn').onclick = openOB; if (!localStorage.getItem(KEY_HIDE)) openOB();
+
+    // ========= Calculate (popup toggle + no popup on first render) =========
+    const CM_KEY='calc_auto_show';
+    if(localStorage.getItem(CM_KEY)===null) localStorage.setItem(CM_KEY,'1');
+    // checkbox exists in modal; sync it
+    const autoCb = document.getElementById('calc_auto');
+    if (autoCb) {
+      autoCb.checked = localStorage.getItem(CM_KEY)==='1';
+      autoCb.addEventListener('change', e => localStorage.setItem(CM_KEY, e.target.checked ? '1' : '0'));
+    }
+    function calculate(showPopup){
+      const P = parseFloat($('principal').value);
+      const rate = parseFloat($('rate').value);
+      const years = parseInt($('years').value,10);
+      const extra = parseFloat($('extra').value || '0');
+      $('status').textContent='';
+      if (!(P > 0 && rate >= 0 && years >= 1 && extra >= 0)) { $('status').textContent = 'Please check your inputs.'; return; }
+      try {
+        const baseline = buildSchedule(P, rate, years, 0);
+        const withExtra = buildSchedule(P, rate, years, extra);
+        render(withExtra, baseline);
+        $('status').textContent = `Payments: ${withExtra.schedule.length}${extra>0 ? ` (saved ${baseline.schedule.length - withExtra.schedule.length} months)` : ''}`;
+        $('csvBtn').onclick = () => download('amortization.csv', toCSV(withExtra.schedule));
+        if (showPopup && localStorage.getItem(CM_KEY)==='1') showCalcSummary(withExtra, baseline);
+      } catch(e){ $('status').textContent = e.message || 'Calculation error'; }
+    }
+    $('calcBtn').addEventListener('click', ()=>calculate(true));
+    $('csvBtn').addEventListener('click', () => { $('status').textContent = 'Calculate first to export CSV.'; });
+    $('resetBtn').addEventListener('click', (e) => { e.preventDefault(); $('principal').value = 350000; $('rate').value = 6.5; $('years').value = 30; $('extra').value = 0; $('status').textContent = 'Inputs reset.'; });
+
+    // initial render (no popup)
+    calculate(false);
+  </script>
+</body>
+</html>

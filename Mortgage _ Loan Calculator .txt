@@ -1,0 +1,26 @@
+﻿Mortgage / Loan Calculator (HTML, CSS, JavaScript)
+A fully responsive mortgage and loan calculator built from scratch with vanilla HTML, CSS, and JavaScript.
+🔹 Features:
+* Clean, responsive UI (desktop → mobile) with dark/light theme toggle.
+
+* Calculates monthly payments, total interest, and total repayment based on loan amount, APR, and term.
+
+* Supports extra monthly payments, showing how they save time and reduce interest.
+
+* Generates a full amortization schedule with interest/principal breakdown.
+
+* Interactive Chart.js graph to visualize payments and remaining balance.
+
+* Export schedule to CSV for offline use.
+
+* Accessible popups with detailed explanations of financial terms (APR, principal, interest) for users new to finance.
+
+🔹 Tech Stack:
+   * Frontend: HTML5, CSS3, JavaScript (ES6), Chart.js
+
+   * Responsive Design: Custom CSS + Bootstrap grid utilities
+
+   * Accessibility: Keyboard & screen-reader friendly, clear modals and labels
+
+🔹 Why it’s interesting:
+This project demonstrates problem-solving, UI/UX thinking, and responsive design skills. It combines financial math logic with a clean, interactive user experience, turning complex mortgage calculations into something visual, intuitive, and educational.
